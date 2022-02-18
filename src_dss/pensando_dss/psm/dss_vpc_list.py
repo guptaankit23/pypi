@@ -56,7 +56,8 @@ with pensando_dss.psm.ApiClient(configuration) as api_client:
             print(f"\nThere are {len(api_response.to_dict()['items'])} configured VRFs\n")
             api_response_dict = api_response.to_dict()
             max_column_width_list = get_max_width(api_response_dict['items'], display_fields)
-            print("VRF NAME".ljust(max_column_width_list[0]), "UUID".ljust(max_column_width_list[1]), "STATUS".ljust(max_column_width_list[2]))
+            print("VRF NAME".ljust(max_column_width_list[0])+ "UUID".ljust(max_column_width_list[1])+ "STATUS".ljust(max_column_width_list[2]))
+            print("--------".ljust(max_column_width_list[0])+ "----".ljust(max_column_width_list[1])+ "------".ljust(max_column_width_list[2]))
             for out in api_response_dict['items']:
                 print_list = pretty_print(display_fields, out)
                 for v in print_list:

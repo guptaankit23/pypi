@@ -14,7 +14,14 @@ def set_api_keys(key_list, api_output):
         if type(val) == dict:
             for k,v in val.items():
                 if k in key_list:
-                    e.name[k] = v
+                    if k == 'alg':
+                        e.name[k] = "Yes"
+                        e.name['type'] = v['type']
+                    if type(v) == list:
+                        e.name[k] = (",").join(v)
+                    elif type(v) is not dict:
+                        e.name[k] = v
+                    continue
                 find_next_key(e,v,key_list)
     return e
 
@@ -37,7 +44,8 @@ def find_next_key(entry, d, key_list):
                     e.name[k] = v
                 if type(v) == list or type(v) == dict:
                     find_next_key(e, v, key_list)
-            entry.next.append(e)
+            if len(e.name.keys()) > 0:
+                entry.next.append(e)
 
 def get_result_dict(e):
     res_list = []
@@ -76,7 +84,7 @@ def pretty_print(key_list, api_out):
             if key in ele:
                 temp_list.append(ele[key])
             else:
-                temp_list.append([""])
+                temp_list.append("-")
         update_result_list(print_list, temp_list)
     return print_list
 
@@ -94,8 +102,5 @@ def get_max_width(api_out, key_list):
             if key in res[0]:
                 if len(str(res[0][key]))+padding > w:
                     w = len(str(res[0][key]))+padding
-            else:
-                w = padding
         width_list.append(w)
     return width_list
-    
