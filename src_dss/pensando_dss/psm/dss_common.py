@@ -8,6 +8,10 @@ class Key_Struct(NamedTuple):
     name: dict
     next: list
 
+required_fields = {
+    'Network': ['virtual_router', 'vlan', 'name', 'type']
+}
+
 def set_api_keys(key_list, api_output):
     e = Key_Struct(name={}, next=[])
     for val in api_output.values():
@@ -89,6 +93,7 @@ def pretty_print(key_list, api_out):
     return print_list
 
 def get_max_width(api_out, key_list):
+    min_width = get_key_max_width(key_list)
     padding = 10
     res_list = []
     for out in api_out:
@@ -97,10 +102,66 @@ def get_max_width(api_out, key_list):
         res_list.append(res)
     width_list = []
     for key in key_list:
-        w = 0
         for res in res_list:
             if key in res[0]:
-                if len(str(res[0][key]))+padding > w:
-                    w = len(str(res[0][key]))+padding
-        width_list.append(w)
+                if len(str(res[0][key]))+padding > min_width:
+                    min_width = len(str(res[0][key]))+padding
+        width_list.append(min_width)
     return width_list
+
+def get_key_max_width(key_list):
+    w = 0
+    for key in key_list:
+        if len(key) > w:
+            w = len(key)
+    return w
+
+def get_network_body(input_dict):
+    if 'ingress_security_policy' in input_dict and 'egress_security_policy' in input_dict:
+        spec = NetworkNetworkSpec(
+                    egress_security_policy=[
+                        input_dict['egress_security_policy']
+                    ],
+                    ingress_security_policy=[
+                        input_dict['ingress_security_policy']
+                    ],
+                    type=input_dict['type'],
+                    virtual_router=input_dict['virtual_router'],
+                    vlan_id=input_dict['vlan'],
+                )
+    elif 'ingress_security_policy' in input_dict:
+        spec = NetworkNetworkSpec(
+                    ingress_security_policy=[
+                        input_dict['ingress_security_policy']
+                    ],
+                    type=input_dict['type'],
+                    virtual_router=input_dict['virtual_router'],
+                    vlan_id=input_dict['vlan'],
+                )
+    elif 'egress_security_policy' in input_dict:
+        spec = NetworkNetworkSpec(
+                    egress_security_policy=[
+                        input_dict['egress_security_policy']
+                    ],
+                    type=input_dict['type'],
+                    virtual_router=input_dict['virtual_router'],
+                    vlan_id=input_dict['vlan'],
+                )
+    else:
+        print('\n**Both Ingress & Egress Policy are empty. No updates required**\n')
+        exit()
+    return NetworkNetwork(
+            kind="Network",
+            spec=spec
+        )
+
+def validate_input_file(input_dict, type):
+    if type in input_dict:
+        input = input_dict[type]
+    else:
+        print(f'\n**{type} not found in input file**\n')
+        exit()
+    for field in required_fields[type]:
+        if field not in input:
+            print(f'\n**Required field: {field}, is missing, update the input file correctly with required fields**\n')
+            exit()
