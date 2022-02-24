@@ -2,6 +2,11 @@ from pensando_dss.psm.models.network import *
 from pprint import pprint
 from typing import NamedTuple
 import json
+from pensando_dss.psm.api import security_v1_api
+from pensando_dss.psm.model.network_network import NetworkNetwork
+from pensando_dss.psm.model.network_virtual_router import NetworkVirtualRouter
+from pensando_dss.psm.models.security import *
+from pensando_dss.psm.model.security_network_security_policy import SecurityNetworkSecurityPolicy
 
 
 class Key_Struct(NamedTuple):
@@ -9,7 +14,9 @@ class Key_Struct(NamedTuple):
     next: list
 
 required_fields = {
-    'Network': ['virtual_router', 'vlan', 'name', 'type']
+    'Network': ['vrf', 'vlan', 'name'],
+    'Vrf': [],
+    'Security_policy': []
 }
 
 def set_api_keys(key_list, api_output):
@@ -117,43 +124,111 @@ def get_key_max_width(key_list):
     return w
 
 def get_network_body(input_dict):
-    if 'ingress_security_policy' in input_dict and 'egress_security_policy' in input_dict:
-        spec = NetworkNetworkSpec(
-                    egress_security_policy=[
-                        input_dict['egress_security_policy']
-                    ],
-                    ingress_security_policy=[
-                        input_dict['ingress_security_policy']
-                    ],
-                    type=input_dict['type'],
-                    virtual_router=input_dict['virtual_router'],
-                    vlan_id=input_dict['vlan'],
-                )
-    elif 'ingress_security_policy' in input_dict:
-        spec = NetworkNetworkSpec(
-                    ingress_security_policy=[
-                        input_dict['ingress_security_policy']
-                    ],
-                    type=input_dict['type'],
-                    virtual_router=input_dict['virtual_router'],
-                    vlan_id=input_dict['vlan'],
-                )
-    elif 'egress_security_policy' in input_dict:
-        spec = NetworkNetworkSpec(
-                    egress_security_policy=[
-                        input_dict['egress_security_policy']
-                    ],
-                    type=input_dict['type'],
-                    virtual_router=input_dict['virtual_router'],
-                    vlan_id=input_dict['vlan'],
-                )
-    else:
-        print('\n**Both Ingress & Egress Policy are empty. No updates required**\n')
-        exit()
+    # if 'ingress_security_policy' in input_dict and 'egress_security_policy' in input_dict:
+    #     spec = NetworkNetworkSpec(
+    #                 egress_security_policy=[
+    #                     input_dict['egress_security_policy']
+    #                 ],
+    #                 ingress_security_policy=[
+    #                     input_dict['ingress_security_policy']
+    #                 ],
+    #                 type=input_dict['type'],
+    #                 virtual_router=input_dict['virtual_router'],
+    #                 vlan_id=input_dict['vlan'],
+    #             )
+    # elif 'ingress_security_policy' in input_dict:
+    #     spec = NetworkNetworkSpec(
+    #                 ingress_security_policy=[
+    #                     input_dict['ingress_security_policy']
+    #                 ],
+    #                 type=input_dict['type'],
+    #                 virtual_router=input_dict['virtual_router'],
+    #                 vlan_id=input_dict['vlan'],
+    #             )
+    # elif 'egress_security_policy' in input_dict:
+    #     spec = NetworkNetworkSpec(
+    #                 egress_security_policy=[
+    #                     input_dict['egress_security_policy']
+    #                 ],
+    #                 type=input_dict['type'],
+    #                 virtual_router=input_dict['virtual_router'],
+    #                 vlan_id=input_dict['vlan'],
+    #             )
+    # else:
+    #     print('\n**Both Ingress & Egress Policy are empty. No updates required**\n')
+    #     exit()
+    netspec_dict = {           
+                "firewall_profile" : NetworkNetworkFirewallProfile(
+                    enable_fw_logging = True,
+                ),
+                "virtual_router" : input_dict["vrf"],
+                "vlan_id" : input_dict["vlan"]
+                }
+    #Check if ig/eg policies are absent or empty and add only if present.
+    if 'ingress_security_policy' in input_dict or input_dict["ingress_security_policy"] != "":
+        netspec_dict["ingress_security_policy"] = [input_dict["ingress_security_policy"]]
+    if 'egress_security_policy' in input_dict or input_dict["egress_security_policy"] != "":
+        netspec_dict["egress_security_policy"] = [input_dict["egress_security_policy"]]
+
+    spec = NetworkNetworkSpec(**netspec_dict)
     return NetworkNetwork(
             kind="Network",
+            meta=ApiObjectMeta(name=input_dict["name"]),
             spec=spec
         )
+
+def get_vrf_body(input_dict):
+    body = NetworkVirtualRouter(
+        meta=ApiObjectMeta(
+            name=input_dict["name"],
+        ),
+    )
+    return body
+
+def get_security_policy_body(input_dict):
+    rules_list = []
+    #Default required params for rule_dict
+    rule_dict =     {
+                        "action": "",
+                        "description" : "",
+                        "from_ip_addresses": [],
+                        "name": "",
+                        "to_ip_addresses":[]
+                }
+    #Creating rules list
+    for rule_item in input_dict["rules"]:
+        rule_dict_item = rule_dict.copy()
+        rule_dict_item["action"]= rule_item["action"]
+        rule_dict_item["description"]= rule_item["description"]
+        rule_dict_item["from_ip_addresses"]= rule_item["from-ip-addresses"]
+        rule_dict_item["name"]= rule_item["name"]
+        rule_dict_item["to_ip_addresses"] = rule_item["to-ip-addresses"]
+
+        #Checking if "proto-ports" is used or "apps" is used and add the param accordingly
+        if "proto-ports" in rule_item.keys():
+            rule_dict_item["proto_ports"] = [SecurityProtoPort(
+                                ports=rule_item["proto-ports"][0]["ports"],
+                                protocol=rule_item["proto-ports"][0]["protocol"],
+                            )
+            ]
+        elif "apps" in rule_item.keys():
+            rule_dict_item["apps"] = [rule_item["apps"]]
+        
+        rules_list.append(SecuritySGRule(**rule_dict_item))
+
+    body = SecurityNetworkSecurityPolicy(
+        meta=ApiObjectMeta(
+            name=input_dict["name"],
+        ),
+        spec=SecurityNetworkSecurityPolicySpec(
+            attach_tenant=True,
+            rules=rules_list,
+        ),
+
+    )
+
+    return body
+
 
 def validate_input_file(input_dict, type):
     if type in input_dict:
@@ -161,7 +236,9 @@ def validate_input_file(input_dict, type):
     else:
         print(f'\n**{type} not found in input file**\n')
         exit()
-    for field in required_fields[type]:
-        if field not in input:
-            print(f'\n**Required field: {field}, is missing, update the input file correctly with required fields**\n')
-            exit()
+    print(input)
+    for item in input:
+        for field in required_fields[type]:
+            if field not in item:
+                print(f'\n**Required field: {field}, is missing, update the input file correctly with required fields**\n')
+                exit()
