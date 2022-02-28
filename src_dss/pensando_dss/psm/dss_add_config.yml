@@ -1,0 +1,88 @@
+Vrf:
+  - name: pypi_example_vrf_1
+    labels: 
+      example_label_key_1: example_label_value_1
+
+Network:
+  # (Required) Network Name in PSM
+  - name: pypi_example_network_1
+    # (Required) VLAN ID associated with Network Object
+    vlan: 1992
+    # (Required) Type of network
+    type: bridged
+    # (Required) VPC/VRF Name
+    vrf: pypi_example_vrf_1
+    # Egress Policy Name
+    egress_security_policy: pypi_example_security_policy_1
+    # Ingress Policy Name
+    ingress_security_policy: pypi_example_security_policy_1
+
+
+Security_policy:
+  # (Required) Security_Policy Name in PSM
+  - name: pypi_example_security_policy_1
+    # (Required) Rule-list with either proto-ports or apps.
+    rules: 
+      - name: pypi_example_security_policy_1_rule_1
+        description: "rule1_sample"
+        proto-ports:
+          - protocol: tcp
+            ports: '443,80'
+        action: permit
+        from-ip-addresses:
+        - 192.168.0.1
+        to-ip-addresses:
+        - 192.168.1.1        
+      - name: pypi_example_security_policy_1_rule_2
+        description: "rule2_sample"
+        apps: "pyp1_test_app"
+        action: permit
+        from-ip-addresses:
+        - 10.0.0.0/24
+        to-ip-addresses:
+        - 10.1.0.0/24
+    priority: ""
+  - name: pypi_example_security_policy_2
+    # (Required) Rule-list with either proto-ports or apps.
+    rules: 
+      - name: pypi_example_security_policy_2_rule_1
+        description: "rule1_sample"
+        proto-ports:
+          - protocol: tcp
+            ports: '443,80'
+        action: permit
+        from-ip-addresses:
+        - 192.168.2.1
+        to-ip-addresses:
+        - 192.168.3.1        
+      - name: pypi_example_security_policy_2_rule_2
+        description: "rule2_sample"
+        apps: "pyp1_test_app"
+        action: permit
+        from-ip-addresses:
+        - 10.1.0.0/24
+        to-ip-addresses:
+        - 10.2.0.0/24
+    priority: ""
+
+App:
+  - name: pypi_example_app_1
+    proto_ports:
+      - ports: '80'
+        protocol: tcp
+  - name: pypi_example_app_2
+    alg:
+      type: icmp
+      icmp:
+        code: '0'
+        type: '8'
+
+#Test Creation of Objects
+# python3 dss_vrf_add.py --input_file input.yml 
+# python3 dss_security_policy_add.py --input_file input.yml 
+# python3 dss_network_add.py --input_file input.yml 
+
+#Test Deletion of Objects
+# python3 dss_network_delete.py --name pypi_example_network_1
+# python3 dss_security_policy_delete.py --name pypi_example_security_policy_1
+# python3 dss_vrf_delete.py --name pypi_example_vrf_1

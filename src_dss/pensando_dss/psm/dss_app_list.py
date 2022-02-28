@@ -1,29 +1,30 @@
+import time
 import os
 import pensando_dss
 import pensando_dss.psm
 import argparse
+import sys
 import urllib3
-import requests
-from pensando_dss.psm.api import network_v1_api
-from pensando_dss.psm.models.network import *
+from pensando_dss.psm.api import security_v1_api
+from pensando_dss.psm.models.security import *
+from pensando_dss.psm.model.security_app_list import SecurityAppList
+from pensando_dss.psm.model.api_status import ApiStatus
 from pprint import pprint
 from dss_common import *
 from dateutil.parser import parse as dateutil_parser
-
 # Defining the host is optional and defaults to http://localhost
 # See configuration.py for a list of all supported configuration parameters.
 configuration = pensando_dss.psm.Configuration(
     psm_config_path = os.environ["HOME"] + "/.psm/config.json",
-    interactive_mode=True
+    interactive_mode = True
 )
 configuration.verify_ssl = False
 
-urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 # Enter a context with an instance of the API client
 with pensando_dss.psm.ApiClient(configuration) as api_client:
     # Create an instance of the API class
-    api_instance = network_v1_api.NetworkV1Api(api_client)
+    api_instance = security_v1_api.SecurityV1Api(api_client)
     o_name = "O.name_example" # str | Name of the object, unique within a Namespace for scoped objects. Must start and end with alpha numeric and can have alphanumeric, -, _, . Length of string should be between 2 and 64. (optional)
     o_tenant = "O.tenant_example" # str | Tenant to which the object belongs to. This can be automatically filled in many cases based on the tenant the user, who created the object, belongs to. Must be alpha-numerics. Length of string should be between 1 and 48. (optional)
     o_namespace = "O.namespace_example" # str | Namespace of the object, for scoped objects. Must start and end with alpha numeric and can have alphanumeric, -, _, . Length of string should be between 2 and 64. (optional)
@@ -45,29 +46,31 @@ with pensando_dss.psm.ApiClient(configuration) as api_client:
 
     # example passing only required values which don't have defaults set
     try:
-        description = "List all configured Network objects on the Pensando PSM"
+        description = "List all configured App objects"
         parser = argparse.ArgumentParser(description=description)
-        parser.add_argument("-v", "--verbose", help = "Verbose output for all configured Networks", action="store_true")
-        parser.add_argument("-n", "---name", help = "Show verbose information for specified Network")
+        parser.add_argument("-v", "--verbose", help = "Verbose output for all configured Apps", action="store_true")
+        parser.add_argument("-n", "---name", help = "Verbose output for a specified App")
         args = parser.parse_args()
         if not args.verbose and not args.name:
-            display_fields = ['name', 'virtual_router', 'vlan_id', 'ingress_security_policy', 'egress_security_policy', 'status']
-            api_response = api_instance.list_network1()
-            print(f"\nThere are {len(api_response.to_dict()['items'])} configured Networks\n")
+            display_fields = ['name', 'alg', 'type', 'protocol', 'ports']
+            api_response = api_instance.list_app1()
+            print(f"\nThere are {len(api_response.to_dict()['items'])} configured Apps\n")
+            dict = api_response.to_dict()
             api_response_dict = api_response.to_dict()
             max_column_width_list = get_max_width(api_response_dict['items'], display_fields)
-            print("NETWORK NAME".ljust(max_column_width_list[0])+ "VRF".ljust(max_column_width_list[1])+ "VLAN".ljust(max_column_width_list[2])+ "INGRESS POLICY".ljust(max_column_width_list[3])+ "EGRESS POLICY".ljust(max_column_width_list[4])+ "PRPOGATION STATUS".ljust(max_column_width_list[5]))
-            print("------------".ljust(max_column_width_list[0])+ "---".ljust(max_column_width_list[1])+ "----".ljust(max_column_width_list[2])+ "--------------".ljust(max_column_width_list[3])+ "-------------".ljust(max_column_width_list[4])+ "-----------------".ljust(max_column_width_list[5]))
+            print("APP NAME".ljust(max_column_width_list[0]) + "ALG".ljust(max_column_width_list[1]) + "ALG TYPE".ljust(max_column_width_list[2]) + "PROTOCOL".ljust(max_column_width_list[3])+ "PORTS".ljust(max_column_width_list[4]))
+            print("--------".ljust(max_column_width_list[0])+ "----".ljust(max_column_width_list[1])+ "--------".ljust(max_column_width_list[2])+   "---------".ljust(max_column_width_list[3])+ "----".ljust(max_column_width_list[4]))
             for out in api_response_dict['items']:
                 print_list = pretty_print(display_fields, out)
                 for v in print_list:
-                    name, vrf, vlan, ing_pol, egr_pol, prop_status = v
-                    print(name.ljust(max_column_width_list[0])+ vrf.ljust(max_column_width_list[1]) + str(vlan).ljust(max_column_width_list[2]) + ing_pol.ljust(max_column_width_list[3]) + egr_pol.ljust(max_column_width_list[4]) + prop_status.ljust(max_column_width_list[5]))
+                    name, alg, type, por, pro = v
+                    print(name.ljust(max_column_width_list[0]) + alg.ljust(max_column_width_list[1]) + type.ljust(max_column_width_list[2]) + por.ljust(max_column_width_list[3]) + pro.ljust(max_column_width_list[4]))
         if args.verbose:
-             api_response = api_instance.list_network1()
+             api_response = api_instance.list_app1()
              pprint(api_response.to_dict())
         if args.name:
-            api_response = api_instance.list_network1(o_name=args.name)
+            api_response = api_instance.list_app1(o_name=args.name)
             pprint(api_response.to_dict())
+
     except pensando_dss.psm.ApiException as e:
-        print("Exception when calling NetworkV1Api->list_network1: %s\n" % e)
+        print("Exception when calling SecurityV1Api->list_app1: %s\n" % e)

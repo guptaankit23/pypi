@@ -1,8 +1,12 @@
 from pensando_dss.psm.models.network import *
 from pprint import pprint
 from typing import NamedTuple
-import json
-from pensando_dss.psm.api import security_v1_api
+import copy
+from pensando_dss.psm.model.security_app import SecurityApp
+from pensando_dss.psm.model.security_app_spec import SecurityAppSpec
+from pensando_dss.psm.model.security_alg import SecurityALG
+from pensando_dss.psm.model.security_icmp import SecurityIcmp
+from pensando_dss.psm.model.security_proto_port import SecurityProtoPort
 from pensando_dss.psm.model.network_network import NetworkNetwork
 from pensando_dss.psm.model.network_virtual_router import NetworkVirtualRouter
 from pensando_dss.psm.models.security import *
@@ -16,15 +20,18 @@ class Key_Struct(NamedTuple):
 required_fields = {
     'Network': ['vrf', 'vlan', 'name'],
     'Vrf': [],
-    'Security_policy': []
+    'Security_policy': [],
+    'App': []
 }
 
 def set_api_keys(key_list, api_output):
+    key_list_copy = copy.deepcopy(key_list)
     e = Key_Struct(name={}, next=[])
     for val in api_output.values():
         if type(val) == dict:
             for k,v in val.items():
                 if k in key_list:
+                    update_key_list(key_list_copy,k)
                     if k == 'alg':
                         e.name[k] = "Yes"
                         e.name['type'] = v['type']
@@ -33,18 +40,24 @@ def set_api_keys(key_list, api_output):
                     elif type(v) is not dict:
                         e.name[k] = v
                     continue
-                find_next_key(e,v,key_list)
+                find_next_key(e,v,key_list_copy)
     return e
 
+def update_key_list(key_list,k):
+    key_list.remove(k)
+
 def find_next_key(entry, d, key_list):
+    key_list_copy = copy.deepcopy(key_list)
     if type(d) == dict:
         e = Key_Struct(name={}, next=[])
         for k,v in d.items():
             if k in key_list:
                 e.name[k] = v
+                update_key_list(key_list_copy,k)
             if type(v) == list or type(v) == dict:
-                find_next_key(e, v, key_list)
-        entry.next.append(e)
+                find_next_key(e, v, key_list_copy)
+        if len(e.name.keys()) > 0:
+            entry.next.append(e)
     elif type(d) == list:
         for item in d:
             if type(item) != dict:
@@ -106,6 +119,7 @@ def get_max_width(api_out, key_list):
     for out in api_out:
         e = set_api_keys(key_list, out)
         res = get_result_dict(e)
+        # print(e,'\n',res)
         res_list.append(res)
     width_list = []
     for key in key_list:
@@ -124,39 +138,6 @@ def get_key_max_width(key_list):
     return w
 
 def get_network_body(input_dict):
-    # if 'ingress_security_policy' in input_dict and 'egress_security_policy' in input_dict:
-    #     spec = NetworkNetworkSpec(
-    #                 egress_security_policy=[
-    #                     input_dict['egress_security_policy']
-    #                 ],
-    #                 ingress_security_policy=[
-    #                     input_dict['ingress_security_policy']
-    #                 ],
-    #                 type=input_dict['type'],
-    #                 virtual_router=input_dict['virtual_router'],
-    #                 vlan_id=input_dict['vlan'],
-    #             )
-    # elif 'ingress_security_policy' in input_dict:
-    #     spec = NetworkNetworkSpec(
-    #                 ingress_security_policy=[
-    #                     input_dict['ingress_security_policy']
-    #                 ],
-    #                 type=input_dict['type'],
-    #                 virtual_router=input_dict['virtual_router'],
-    #                 vlan_id=input_dict['vlan'],
-    #             )
-    # elif 'egress_security_policy' in input_dict:
-    #     spec = NetworkNetworkSpec(
-    #                 egress_security_policy=[
-    #                     input_dict['egress_security_policy']
-    #                 ],
-    #                 type=input_dict['type'],
-    #                 virtual_router=input_dict['virtual_router'],
-    #                 vlan_id=input_dict['vlan'],
-    #             )
-    # else:
-    #     print('\n**Both Ingress & Egress Policy are empty. No updates required**\n')
-    #     exit()
     netspec_dict = {           
                 "firewall_profile" : NetworkNetworkFirewallProfile(
                     enable_fw_logging = True,
@@ -165,11 +146,10 @@ def get_network_body(input_dict):
                 "vlan_id" : input_dict["vlan"]
                 }
     #Check if ig/eg policies are absent or empty and add only if present.
-    if 'ingress_security_policy' in input_dict or input_dict["ingress_security_policy"] != "":
+    if 'ingress_security_policy' in input_dict and input_dict["ingress_security_policy"] != "":
         netspec_dict["ingress_security_policy"] = [input_dict["ingress_security_policy"]]
-    if 'egress_security_policy' in input_dict or input_dict["egress_security_policy"] != "":
+    if 'egress_security_policy' in input_dict and input_dict["egress_security_policy"] != "":
         netspec_dict["egress_security_policy"] = [input_dict["egress_security_policy"]]
-
     spec = NetworkNetworkSpec(**netspec_dict)
     return NetworkNetwork(
             kind="Network",
@@ -183,6 +163,8 @@ def get_vrf_body(input_dict):
             name=input_dict["name"],
         ),
     )
+    if 'labels' in input_dict:
+        body.meta.labels = input_dict['labels']
     return body
 
 def get_security_policy_body(input_dict):
@@ -229,6 +211,32 @@ def get_security_policy_body(input_dict):
 
     return body
 
+def get_app_body(input_dict):
+    spec = SecurityAppSpec()
+    alg_spec = {}
+    if 'proto_ports' in input_dict:
+        pp = []
+        for entry in input_dict['proto_ports']:
+            pp.append(SecurityProtoPort(**entry))
+        spec.proto_ports = pp
+    if 'alg' in input_dict and 'icmp' in input_dict['alg']:
+        spec = SecurityAppSpec(
+            alg = SecurityALG(
+            type = 'icmp',
+            icmp = SecurityIcmp(**input_dict['alg']['icmp'])
+            ),
+        )
+
+    body = SecurityApp(
+        kind = 'App',
+        meta = ApiObjectMeta(
+            name=input_dict["name"],
+        ),
+        spec = spec,
+    )
+    print(body)
+    return body
+
 
 def validate_input_file(input_dict, type):
     if type in input_dict:
@@ -236,9 +244,13 @@ def validate_input_file(input_dict, type):
     else:
         print(f'\n**{type} not found in input file**\n')
         exit()
-    print(input)
     for item in input:
         for field in required_fields[type]:
             if field not in item:
                 print(f'\n**Required field: {field}, is missing, update the input file correctly with required fields**\n')
                 exit()
+
+def get_rule_length(out):
+    if 'rules' not in out['spec']:
+        return str(0)
+    return str(len(out['spec']['rules']))

@@ -13,7 +13,8 @@ from dateutil.parser import parse as dateutil_parser
 # Defining the host is optional and defaults to http://localhost
 # See configuration.py for a list of all supported configuration parameters.
 configuration = pensando_dss.psm.Configuration(
-    psm_config_path = os.environ["HOME"] + "/.psm/config.json"
+    psm_config_path = os.environ["HOME"] + "/.psm/config.json",
+    interactive_mode=True
 )
 configuration.verify_ssl = False
 

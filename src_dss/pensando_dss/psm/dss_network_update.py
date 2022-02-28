@@ -16,7 +16,8 @@ from dateutil.parser import parse as dateutil_parser
 # Defining the host is optional and defaults to http://localhost
 # See configuration.py for a list of all supported configuration parameters.
 configuration = pensando_dss.psm.Configuration(
-    psm_config_path = os.environ["HOME"] + "/.psm/config.json"
+    psm_config_path = os.environ["HOME"] + "/.psm/config.json",
+    interactive_mode=True
 )
 configuration.verify_ssl = False
 
@@ -37,30 +38,30 @@ def update_network_policy(input_file):
     with open(input_file, 'r') as fp:
         input = yaml.safe_load(fp)
         validate_input_file(input, 'Network')
-        
-    with pensando_dss.psm.ApiClient(configuration) as api_client:
-        # Create an instance of the API class
-        api_instance = network_v1_api.NetworkV1Api(api_client)
-        body = get_network_body(input['Network'])
-        # example passing only required values which don't have defaults set
-        try:
-            api_response = api_instance.update_network1(input['Network']['name'], body)
-            display_fields = ['name', 'virtual_router', 'vlan_id', 'ingress_security_policy', 'egress_security_policy', 'status']
-            # Update Network object
-            api_response_dict = api_response.to_dict()
-            # print(api_response_dict)
-            max_column_width_list = get_max_width([api_response_dict], display_fields)
-            print("NETWORK NAME".ljust(max_column_width_list[0])+ "VRF".ljust(max_column_width_list[1])+ "VLAN".ljust(max_column_width_list[2])+ "INGRESS POLICY".ljust(max_column_width_list[3])+ "EGRESS POLICY".ljust(max_column_width_list[4])+ "PRPOGATION STATUS".ljust(max_column_width_list[5]))
-            print("------------".ljust(max_column_width_list[0])+ "---".ljust(max_column_width_list[1])+ "----".ljust(max_column_width_list[2])+ "--------------".ljust(max_column_width_list[3])+ "-------------".ljust(max_column_width_list[4])+ "-----------------".ljust(max_column_width_list[5]))
+    for network in input['Network']:
+        with pensando_dss.psm.ApiClient(configuration) as api_client:
+            # Create an instance of the API class
+            api_instance = network_v1_api.NetworkV1Api(api_client)
+            body = get_network_body(network)
+            # example passing only required values which don't have defaults set
+            try:
+                api_response = api_instance.update_network1(network['name'], body)
+                # display_fields = ['name', 'virtual_router', 'vlan_id', 'ingress_security_policy', 'egress_security_policy', 'status']
+                # # Update Network object
+                # api_response_dict = api_response.to_dict()
+                # # print(api_response_dict)
+                # max_column_width_list = get_max_width([api_response_dict], display_fields)
+                # print("NETWORK NAME".ljust(max_column_width_list[0])+ "VRF".ljust(max_column_width_list[1])+ "VLAN".ljust(max_column_width_list[2])+ "INGRESS POLICY".ljust(max_column_width_list[3])+ "EGRESS POLICY".ljust(max_column_width_list[4])+ "PRPOGATION STATUS".ljust(max_column_width_list[5]))
+                # print("------------".ljust(max_column_width_list[0])+ "---".ljust(max_column_width_list[1])+ "----".ljust(max_column_width_list[2])+ "--------------".ljust(max_column_width_list[3])+ "-------------".ljust(max_column_width_list[4])+ "-----------------".ljust(max_column_width_list[5]))
+                
+                # print_list = pretty_print(display_fields, api_response_dict)
+                # for v in print_list:
+                #     name, vrf, vlan, ing_pol, egr_pol, prop_status = v
+                #     print(name.ljust(max_column_width_list[0])+ vrf.ljust(max_column_width_list[1]) + str(vlan).ljust(max_column_width_list[2]) + ing_pol.ljust(max_column_width_list[3]) + egr_pol.ljust(max_column_width_list[4]) + prop_status.ljust(max_column_width_list[5]))
             
-            print_list = pretty_print(display_fields, api_response_dict)
-            for v in print_list:
-                name, vrf, vlan, ing_pol, egr_pol, prop_status = v
-                print(name.ljust(max_column_width_list[0])+ vrf.ljust(max_column_width_list[1]) + str(vlan).ljust(max_column_width_list[2]) + ing_pol.ljust(max_column_width_list[3]) + egr_pol.ljust(max_column_width_list[4]) + prop_status.ljust(max_column_width_list[5]))
-        
-            pprint(api_response)
-        except pensando_dss.psm.ApiException as e:
-            print("Exception when calling NetworkV1Api->update_network1: %s\n" % e)
+                pprint(api_response)
+            except pensando_dss.psm.ApiException as e:
+                print("Exception when calling NetworkV1Api->update_network1: %s\n" % e)
 
 if __name__ == '__main__':
     update_network_policy()
